@@ -2,6 +2,9 @@
 
 A Streamlit-based web application for creating and viewing PDFs from clipboard content on Windows. This tool allows you to quickly convert rich text, images, and formatted content from your clipboard into PDF documents using Microsoft Word's rendering engine.
 
+### Medium Article
+https://medium.com/p/cd5c1f266f66
+
 ## Features
 
 - **📋 Clipboard to PDF**: Convert clipboard content (text, images, formatting) directly to PDF
