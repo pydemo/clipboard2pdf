@@ -234,75 +234,24 @@ def show_pdf(path: str | pathlib.Path):
                 with col2:
                     if st.button("🌐 Force Browser", key="open_browser"):
                         try:
-                            import webbrowser
-                            import tempfile
-                            import shutil
-                            import urllib.parse
+                            import subprocess
                             
-                            # Copy to a temp file with .pdf extension for browser access
-                            temp_dir = tempfile.gettempdir()
-                            safe_filename = filename.replace(' ', '_').replace('(', '').replace(')', '')
-                            temp_pdf = os.path.join(temp_dir, f"browser_{safe_filename}")
+                            # Create proper file URL with forward slashes
+                            file_path = str(path).replace('\\', '/')
+                            file_url = f"file:///{file_path}"
                             
-                            # Copy the file
-                            shutil.copy2(path, temp_pdf)
-                            st.info(f"Copied PDF to: {temp_pdf}")
+                            st.info(f"Opening PDF in Chrome: {file_url}")
                             
-                            # Create proper file URL
-                            temp_pdf_escaped = temp_pdf.replace('\\', '/')
-                            file_url = f"file:///{temp_pdf_escaped}"
+                            # Use subprocess to start Chrome with the file URL
+                            subprocess.run(['start', 'chrome', file_url], shell=True, check=True)
+                            st.success("PDF opened in Chrome browser")
                             
-                            # Make the URL clickable in new tab
-                            st.markdown(f"**Opening URL:** <a href='{file_url}' target='_blank'>Click here to open PDF</a>", unsafe_allow_html=True)
-                            st.code(file_url)
-                            
-                            # Try to open in browser
-                            opened = False
-                            
-                            # Method 1: Try default browser first
-                            try:
-                                webbrowser.open(file_url, new=2)  # new=2 opens in new tab
-                                st.success("PDF opened in default browser")
-                                opened = True
-                            except Exception as e1:
-                                st.warning(f"Default browser failed: {e1}")
-                            
-                            # Method 2: Try Chrome specifically
-                            if not opened:
-                                try:
-                                    chrome = webbrowser.get('chrome')
-                                    chrome.open(file_url, new=2)
-                                    st.success("PDF opened in Chrome")
-                                    opened = True
-                                except Exception as e2:
-                                    st.warning(f"Chrome failed: {e2}")
-                            
-                            # Method 3: Try Edge specifically  
-                            if not opened:
-                                try:
-                                    edge = webbrowser.get('edge')
-                                    edge.open(file_url, new=2)
-                                    st.success("PDF opened in Edge")
-                                    opened = True
-                                except Exception as e3:
-                                    st.warning(f"Edge failed: {e3}")
-                            
-                            # Method 4: Try system default
-                            if not opened:
-                                try:
-                                    os.startfile(temp_pdf)
-                                    st.success("PDF opened with system default")
-                                    opened = True
-                                except Exception as e4:
-                                    st.warning(f"System default failed: {e4}")
-                            
-                            if not opened:
-                                st.error("Could not open PDF in any browser")
-                                st.code(f"Manual file path: {temp_pdf}")
-                                    
+                        except subprocess.CalledProcessError as e:
+                            st.error(f"Failed to open Chrome: {e}")
+                            st.code(f"File path: {str(path)}")
                         except Exception as e:
-                            st.error(f"Error in browser opening: {str(e)}")
-                            st.code(f"Original file path: {str(path)}")
+                            st.error(f"Error opening PDF in browser: {str(e)}")
+                            st.code(f"File path: {str(path)}")
                 
                 with col3:
                     if st.button("📂 File Location", key="open_location"):
