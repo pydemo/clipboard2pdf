@@ -1,4 +1,4 @@
-# Clipboard2PDF (viewapp.py)
+# Clipboard2PDF (pdfapp.py)
 
 A Streamlit-based web application for creating and viewing PDFs from clipboard content on Windows. This tool allows you to quickly convert rich text, images, and formatted content from your clipboard into PDF documents using Microsoft Word's rendering engine.
 
