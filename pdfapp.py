@@ -387,7 +387,7 @@ st.title("Clipboard-to-PDF")
 if 'pdf_path' not in st.session_state:
     st.session_state.pdf_path = None
 
-# JavaScript for keyboard shortcut detection
+# JavaScript for keyboard shortcut detection and auto-select functionality
 keyboard_js = """
 <script>
 document.addEventListener('keydown', function(event) {
@@ -400,6 +400,122 @@ document.addEventListener('keydown', function(event) {
         window.location.href = url.toString();
     }
 });
+
+// Auto-select all text in PDF filename prefix input when clicked/focused
+function setupPdfInputAutoSelect() {
+    // Multiple strategies to find and setup the PDF filename prefix input
+    function findAndSetupInput() {
+        // Strategy 1: Find by label text
+        const labels = document.querySelectorAll('label');
+        let targetInput = null;
+        
+        labels.forEach(function(label) {
+            if (label.textContent.includes('PDF filename prefix')) {
+                const container = label.closest('.stTextInput');
+                if (container) {
+                    const input = container.querySelector('input[type="text"]');
+                    if (input && !input.hasAttribute('data-pdf-input-setup')) {
+                        targetInput = input;
+                    }
+                }
+            }
+        });
+        
+        // Strategy 2: If not found, try finding by input placeholder or nearby text
+        if (!targetInput) {
+            const inputs = document.querySelectorAll('input[type="text"]');
+            inputs.forEach(function(input) {
+                if ((input.placeholder && input.placeholder.includes('filename')) || 
+                    (input.value && (input.value === 'NotebookLM' || input.value.length > 0))) {
+                    if (!input.hasAttribute('data-pdf-input-setup')) {
+                        // Check if this input is in the first column (most likely the filename input)
+                        const container = input.closest('[data-testid="column"]');
+                        if (container && container.previousElementSibling === null) {
+                            targetInput = input;
+                        }
+                    }
+                }
+            });
+        }
+        
+        if (targetInput) {
+            // Mark as setup to avoid duplicate event listeners
+            targetInput.setAttribute('data-pdf-input-setup', 'true');
+            
+            // Disable spellcheck and autocomplete
+            targetInput.setAttribute('spellcheck', 'false');
+            targetInput.setAttribute('autocomplete', 'off');
+            targetInput.setAttribute('autocorrect', 'off');
+            targetInput.setAttribute('autocapitalize', 'off');
+            
+            // Add click event listener
+            targetInput.addEventListener('click', function(e) {
+                // Small delay to ensure the input is focused
+                setTimeout(function() {
+                    targetInput.select();
+                    targetInput.setSelectionRange(0, targetInput.value.length);
+                }, 50);
+            });
+            
+            // Add focus event listener
+            targetInput.addEventListener('focus', function(e) {
+                setTimeout(function() {
+                    targetInput.select();
+                    targetInput.setSelectionRange(0, targetInput.value.length);
+                }, 50);
+            });
+            
+            // Add mouseup prevention to avoid deselection
+            targetInput.addEventListener('mouseup', function(e) {
+                if (targetInput.selectionStart === targetInput.selectionEnd) {
+                    e.preventDefault();
+                    targetInput.select();
+                }
+            });
+            
+            console.log('PDF filename input auto-select setup complete');
+            return true;
+        }
+        return false;
+    }
+    
+    // Try to find and setup immediately
+    findAndSetupInput();
+    
+    // Setup observer for dynamic content
+    const observer = new MutationObserver(function(mutations) {
+        let shouldCheck = false;
+        mutations.forEach(function(mutation) {
+            if (mutation.addedNodes.length > 0) {
+                for (let node of mutation.addedNodes) {
+                    if (node.nodeType === 1 && (node.tagName === 'INPUT' || node.querySelector)) {
+                        shouldCheck = true;
+                        break;
+                    }
+                }
+            }
+        });
+        
+        if (shouldCheck) {
+            setTimeout(findAndSetupInput, 100);
+        }
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+}
+
+// Run setup when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupPdfInputAutoSelect);
+} else {
+    setupPdfInputAutoSelect();
+}
+
+// Also run after a short delay to catch late-loading elements
+setTimeout(setupPdfInputAutoSelect, 500);
 </script>
 """
 
