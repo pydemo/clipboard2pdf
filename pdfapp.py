@@ -187,6 +187,35 @@ def show_pdf(path: str | pathlib.Path):
             key=f"download_{filename}"
         )
         
+        # Check if prefix has changed and offer re-download with new filename
+        current_pdf_name = os.path.basename(path)
+        
+        # Extract original prefix from filename (handle append/prepend modes)
+        if '_append_' in current_pdf_name:
+            current_pdf_prefix = current_pdf_name.split('_append_')[0]
+        elif '_prepend_' in current_pdf_name:
+            current_pdf_prefix = current_pdf_name.split('_prepend_')[0]
+        else:
+            current_pdf_prefix = current_pdf_name.split('_')[0]
+        
+        if st.session_state.current_prefix and st.session_state.current_prefix != current_pdf_prefix:
+            # Prefix has changed - show notification and offer re-download with new prefix
+            st.info(f"🔄 Prefix changed from '{current_pdf_prefix}' to '{st.session_state.current_prefix}' - download with new name available below")
+            
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            new_filename = f"{st.session_state.current_prefix}_{timestamp}.pdf"
+            
+            st.download_button(
+                label=f"📥 Download as '{new_filename}'",
+                data=pdf_bytes,
+                file_name=new_filename,
+                mime="application/pdf",
+                key=f"download_updated_{st.session_state.current_prefix}_{timestamp}",
+                help=f"Download with updated prefix: {st.session_state.current_prefix}",
+                type="primary"
+            )
+        
         st.markdown("### PDF Preview")
         
         # Method 2: Use a simplified approach - just show the first few KB as text preview
@@ -210,7 +239,25 @@ def show_pdf(path: str | pathlib.Path):
                             preview_text = first_page_text[:500]
                             if len(first_page_text) > 500:
                                 preview_text += "..."
-                            st.text(preview_text)
+                            
+                            # Create styled container with background and frame
+                            preview_html = f"""
+                            <div style="
+                                background-color: #f8f9ff;
+                                border: 2px solid #e1e5ff;
+                                border-radius: 8px;
+                                padding: 16px;
+                                margin: 8px 0;
+                                font-family: 'Courier New', monospace;
+                                font-size: 13px;
+                                line-height: 1.4;
+                                white-space: pre-wrap;
+                                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                                max-height: 300px;
+                                overflow-y: auto;
+                            ">{preview_text}</div>
+                            """
+                            st.markdown(preview_html, unsafe_allow_html=True)
                         else:
                             st.info("PDF contains no extractable text (may be image-based)")
                     else:
@@ -335,6 +382,10 @@ st.title("Clipboard-to-PDF")
 # Initialize session state
 if 'pdf_path' not in st.session_state:
     st.session_state.pdf_path = None
+if 'current_prefix' not in st.session_state:
+    st.session_state.current_prefix = None
+if 'pdf_content_cache' not in st.session_state:
+    st.session_state.pdf_content_cache = None
 
 # JavaScript for keyboard shortcut detection and auto-select functionality
 keyboard_js = """
@@ -526,8 +577,10 @@ with col4:
 
 # Handle reset button click
 if reset_clicked:
-    # Clear PDF path from session state
+    # Clear PDF path and cache from session state
     st.session_state.pdf_path = None
+    st.session_state.pdf_content_cache = None
+    # Note: Keep current_prefix so the user doesn't lose their input
     
     # Clear any query parameters that might be cached
     st.query_params.clear()
@@ -536,9 +589,13 @@ if reset_clicked:
     st.success("🔄 Reset complete! PDF cleared, cache cleared. Filename prefix preserved.")
     st.rerun()
 
+# Track prefix changes for re-download functionality
+current_input_prefix = pdf_prefix.strip() if pdf_prefix.strip() else "document"
+st.session_state.current_prefix = current_input_prefix
+
 if create_pdf_clicked or ctrl_v_triggered:
     # Use the prefix from the text input, or default if empty
-    prefix = pdf_prefix.strip() if pdf_prefix.strip() else "document"
+    prefix = current_input_prefix
     
     # Determine the mode and existing PDF path
     existing_pdf = st.session_state.pdf_path if st.session_state.pdf_path and isfile(st.session_state.pdf_path) else None
@@ -548,6 +605,10 @@ if create_pdf_clicked or ctrl_v_triggered:
         with st.spinner(f"{'Adding content to' if existing_pdf else 'Creating'} PDF from clipboard..."):
             pdf_path = create_pdf(prefix, mode, existing_pdf)
             st.session_state.pdf_path = pdf_path
+            
+            # Cache the PDF content for potential re-downloads with new prefix
+            with open(pdf_path, "rb") as f:
+                st.session_state.pdf_content_cache = f.read()
         
         if existing_pdf:
             st.success(f"Content {'appended to' if mode == 'append' else 'prepended to'} PDF: {os.path.basename(pdf_path)}")
