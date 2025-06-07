@@ -154,6 +154,59 @@ def create_pdf(prefix="clipboard", mode="new", existing_pdf_path=None):
         pythoncom.CoUninitialize()
 
 
+def extract_first_header_from_pdf(pdf_path):
+    """Extract the first header from a PDF and return it formatted for filename use"""
+    try:
+        from pypdf import PdfReader
+        import re
+        
+        if not os.path.exists(pdf_path):
+            return ""
+        
+        reader = PdfReader(pdf_path)
+        if len(reader.pages) == 0:
+            return ""
+        
+        # Extract text from first page
+        first_page_text = reader.pages[0].extract_text()
+        if not first_page_text.strip():
+            return ""
+        
+        # Split into lines and find the first meaningful header
+        lines = [line.strip() for line in first_page_text.split('\n') if line.strip()]
+        
+        for line in lines:
+            # Skip very short lines (likely not headers)
+            if len(line) < 3:
+                continue
+            
+            # Skip lines that are just numbers or dates
+            if re.match(r'^\d+$', line) or re.match(r'^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$', line):
+                continue
+            
+            # Skip common non-header patterns
+            if line.lower() in ['page', 'of', 'document', 'pdf', 'created', 'generated']:
+                continue
+            
+            # Take the first meaningful line as the header
+            # Clean it up for filename use
+            header = re.sub(r'[^\w\s-]', '', line)  # Remove special characters except spaces and hyphens
+            header = re.sub(r'\s+', ' ', header).strip()  # Normalize whitespace
+            header = header.replace(' ', '_')  # Replace spaces with underscores
+            
+            # Limit length for filename
+            if len(header) > 50:
+                header = header[:50]
+            
+            return header
+        
+        return ""
+        
+    except Exception as e:
+        print(f"Error extracting header from PDF: {e}")
+        return ""
+
+
 def show_pdf(path: str | pathlib.Path):
     """Display PDF using streamlit's built-in capabilities with fallback options"""
     try:
@@ -383,9 +436,11 @@ st.title("Clipboard-to-PDF")
 if 'pdf_path' not in st.session_state:
     st.session_state.pdf_path = None
 if 'current_prefix' not in st.session_state:
-    st.session_state.current_prefix = None
+    st.session_state.current_prefix = ""
 if 'pdf_content_cache' not in st.session_state:
     st.session_state.pdf_content_cache = None
+if 'extracted_prefix' not in st.session_state:
+    st.session_state.extracted_prefix = ""
 
 # JavaScript for keyboard shortcut detection and auto-select functionality
 keyboard_js = """
@@ -533,11 +588,12 @@ if ctrl_v_triggered:
 col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
 
 with col1:
-    # Text input for PDF filename prefix
+    # Text input for PDF filename prefix - use extracted prefix if available
+    default_value = st.session_state.extracted_prefix if st.session_state.extracted_prefix else ""
     pdf_prefix = st.text_input(
         "PDF filename prefix:",
-        value="NotebookLM",
-        placeholder="Enter filename prefix",
+        value=default_value,
+        placeholder="Will be auto-filled from first PDF header",
         help="The PDF will be saved as: prefix_timestamp.pdf"
     )
 
@@ -609,6 +665,13 @@ if create_pdf_clicked or ctrl_v_triggered:
             # Cache the PDF content for potential re-downloads with new prefix
             with open(pdf_path, "rb") as f:
                 st.session_state.pdf_content_cache = f.read()
+        
+        # Extract header from PDF if this is the first generation and no prefix was set
+        if not existing_pdf and not st.session_state.extracted_prefix:
+            extracted_header = extract_first_header_from_pdf(pdf_path)
+            if extracted_header:
+                st.session_state.extracted_prefix = extracted_header
+                st.info(f"📝 Auto-extracted filename prefix from PDF header: '{extracted_header}'")
         
         if existing_pdf:
             st.success(f"Content {'appended to' if mode == 'append' else 'prepended to'} PDF: {os.path.basename(pdf_path)}")
