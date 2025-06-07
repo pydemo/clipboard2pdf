@@ -414,7 +414,7 @@ if ctrl_v_triggered:
     st.query_params.clear()
 
 # Create columns for controls
-col1, col2, col3 = st.columns([2, 1, 1])
+col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
 
 with col1:
     # Text input for PDF filename prefix
@@ -448,6 +448,28 @@ with col3:
         button_text = "📋 Create PDF (Ctrl+V)"
     
     create_pdf_clicked = st.button(button_text, key="create_pdf_btn")
+
+with col4:
+    # Add some spacing to align button with text input
+    st.write("")  # Empty line for spacing
+    # Reset button - only show if there's a PDF loaded
+    if st.session_state.pdf_path and isfile(st.session_state.pdf_path):
+        reset_clicked = st.button("🔄 Reset", key="reset_btn", help="Clear PDF and cache, keep filename prefix")
+    else:
+        reset_clicked = False
+        st.write("")  # Empty space when no PDF exists
+
+# Handle reset button click
+if reset_clicked:
+    # Clear PDF path from session state
+    st.session_state.pdf_path = None
+    
+    # Clear any query parameters that might be cached
+    st.query_params.clear()
+    
+    # Show success message
+    st.success("🔄 Reset complete! PDF cleared, cache cleared. Filename prefix preserved.")
+    st.rerun()
 
 if create_pdf_clicked or ctrl_v_triggered:
     # Use the prefix from the text input, or default if empty
